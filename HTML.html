@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chiva: La Ruta Suroeste</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:#fff;color:#1a1a1a;overflow:hidden}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+
+/* Header */
+#hdr{height:54px;background:#fff;border-bottom:3px solid #2563EB;display:flex;align-items:center;padding:0 20px;gap:12px;position:sticky;top:0;z-index:200;box-shadow:0 2px 10px rgba(37,99,235,.08)}
+.logo{font-size:16px;font-weight:900;color:#1a1a1a;white-space:nowrap}
+.logo em{color:#2563EB;font-style:normal}
+.tagline{font-size:11px;color:#9ca3af;border-left:1px solid #e5e7eb;padding-left:12px;line-height:1.3}
+.hdr-r{margin-left:auto;display:flex;align-items:center;gap:14px}
+.hdr-stat{text-align:right}
+.hdr-n{font-size:16px;font-weight:800;color:#2563EB;display:block;line-height:1}
+.hdr-l{font-size:9px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em}
+#btn-reset{padding:5px 12px;border:1px solid #d1d5db;border-radius:20px;font-size:11px;font-weight:600;color:#6b7280;background:#fff;display:none;transition:all .15s}
+#btn-reset:hover{border-color:#2563EB;color:#2563EB}
+#btn-reset.vis{display:block}
+
+/* Shell - 3 columnas */
+#shell{display:grid;grid-template-columns:340px 1fr 1fr;height:calc(100vh - 54px)}
+
+/* Mapa col */
+#mcol{border-right:1px solid #e5e7eb;display:flex;flex-direction:column;background:#f8fafc;overflow:hidden}
+#mwrap{flex:1;position:relative;padding:14px 10px 6px;min-height:0}
+#msvg{width:100%;height:100%}
+#tip{position:absolute;pointer-events:none;z-index:50;background:#1a1a1a;color:#fff;font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;opacity:0;transition:opacity .1s;white-space:nowrap}
+path.muni{cursor:pointer;stroke:#fff;stroke-width:.9px;stroke-linejoin:round;transition:filter .18s}
+path.muni:hover{filter:brightness(1.15) drop-shadow(0 1px 5px rgba(0,0,0,.15))}
+path.muni.activo{stroke:#1a1a1a;stroke-width:2.2px;filter:brightness(1.06)}
+path.muni.dim{opacity:.22;pointer-events:none}
+text.lbl{font-size:7px;fill:rgba(255,255,255,.85);pointer-events:none;text-anchor:middle;dominant-baseline:middle;font-weight:500}
+circle.cnt-bg{fill:rgba(0,0,0,.32);pointer-events:none}
+text.cnt-n{font-size:8px;fill:#fff;font-weight:800;pointer-events:none;text-anchor:middle;dominant-baseline:middle}
+
+/* Zona bar */
+#zbar{display:flex;gap:4px;padding:6px 10px;border-top:1px solid #e5e7eb;background:#fff}
+.zb{flex:1;padding:5px 2px;font-size:10px;font-weight:700;background:#f9fafb;color:#9ca3af;border:1px solid #e5e7eb;border-radius:6px;text-align:center;transition:all .15s}
+.zb:hover{color:#374151;border-color:#9ca3af}
+.zb.on{background:#2563EB;color:#fff;border-color:#2563EB}
+
+/* Leyenda */
+#ley{padding:7px 10px 9px;border-top:1px solid #e5e7eb;background:#fff;display:flex;flex-wrap:wrap;gap:5px 12px}
+.li{display:flex;align-items:center;gap:5px;font-size:10px;color:#6b7280}
+.lsq{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+
+/* Panel col */
+.pcol{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid #e5e7eb}
+.pcol:last-child{border-right:none}
+.ptop{padding:12px 16px 10px;border-bottom:1px solid #e5e7eb;flex-shrink:0;background:#fff}
+.sw{position:relative;margin-bottom:9px}
+.srch{width:100%;padding:9px 36px 9px 13px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;font-size:14px;color:#1a1a1a;outline:none;transition:border-color .15s}
+.srch:focus{border-color:#2563EB;background:#fff}
+.srch::placeholder{color:#9ca3af}
+.si{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:16px;pointer-events:none}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{padding:3px 10px;font-size:11px;font-weight:500;background:#f9fafb;border:1px solid #e5e7eb;border-radius:20px;color:#6b7280;transition:all .15s;white-space:nowrap}
+.chip:hover{border-color:#2563EB;color:#2563EB}
+.chip.on{background:#EFF6FF;border-color:#93C5FD;color:#1D4ED8}
+.cbar{padding:6px 16px;border-bottom:1px solid #f3f4f6;font-size:11px;color:#9ca3af;flex-shrink:0;display:flex;justify-content:space-between;align-items:center}
+.cbar strong{color:#2563EB}
+.lista{flex:1;overflow-y:auto;padding:8px 12px 24px}
+.lista::-webkit-scrollbar{width:4px}
+.lista::-webkit-scrollbar-thumb{background:#e5e7eb;border-radius:2px}
+
+/* Panel headers */
+.panel-header{display:flex;justify-content:space-between;align-items:center;padding:6px 16px;border-bottom:1px solid #f3f4f6;flex-shrink:0}
+.panel-header .panel-title{font-size:12px;font-weight:700;color:#374151}
+.panel-header .panel-badge{font-size:10px;color:#2563EB;background:#EFF6FF;padding:2px 10px;border-radius:12px}
+
+/* Cards simplificadas */
+.card{border:1px solid #f3f4f6;border-radius:12px;padding:10px 12px;margin-bottom:6px;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s;animation:fu .2s ease both}
+.card:hover{border-color:#d1d5db;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+.card.open{border-color:#2563EB;box-shadow:0 2px 10px rgba(37,99,235,.1)}
+@keyframes fu{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.ct{display:flex;align-items:flex-start;gap:8px}
+.cico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.cbody{flex:1;min-width:0}
+.cnom{font-size:13px;font-weight:700;color:#111827;line-height:1.2}
+.cmeta{font-size:10px;color:#9ca3af;display:flex;flex-wrap:wrap;gap:2px 6px;margin-top:1px}
+.ctags{display:flex;flex-wrap:wrap;gap:2px;margin-top:3px}
+.tag{font-size:9px;padding:1px 6px;border-radius:12px;background:#f3f4f6;border:1px solid #e5e7eb;color:#6b7280}
+.carr{width:20px;height:20px;border-radius:5px;border:1px solid #e5e7eb;background:#f9fafb;color:#9ca3af;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .2s}
+.card.open .carr{transform:rotate(180deg);border-color:#2563EB;color:#2563EB}
+.det{display:none;margin-top:8px;padding-top:8px;border-top:1px solid #f3f4f6}
+.card.open .det{display:block}
+.det .btn-ver{width:100%;padding:7px;border-radius:8px;font-size:11px;font-weight:700;text-align:center;border:1px solid #DBEAFE;background:#EFF6FF;color:#1D4ED8;transition:all .15s}
+.det .btn-ver:hover{background:#DBEAFE}
+.det .btn-ver.verde{background:#F0FDF4;color:#065F46;border-color:#D1FAE5}
+.det .btn-ver.verde:hover{background:#DCFCE7}
+.empty{text-align:center;padding:50px 20px;color:#9ca3af;font-size:13px;line-height:1.7}
+
+/* Card de municipio (para el panel derecho) */
+.card-muni{border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;margin-bottom:6px;cursor:pointer;background:#fff;transition:all .15s;animation:fu .2s ease both;display:flex;align-items:center;justify-content:space-between}
+.card-muni:hover{border-color:#2563EB;box-shadow:0 1px 6px rgba(37,99,235,.1)}
+.card-muni .muni-nom{font-size:14px;font-weight:700;color:#111827}
+.card-muni .muni-prov{font-size:10px;color:#9ca3af;margin-top:2px}
+.card-muni .muni-badge{font-size:10px;font-weight:600;padding:3px 10px;border-radius:12px;background:#EFF6FF;color:#2563EB}
+.card-muni .muni-arrow{color:#9ca3af;font-size:14px}
+
+/* Modal - sin tabs */
+#modal{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px}
+#modal.on{display:flex}
+#mbox{background:#fff;border-radius:20px;border:1px solid #e5e7eb;width:100%;max-width:680px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.18)}
+
+/* Modal header */
+#mhd{flex-shrink:0;display:flex;align-items:flex-start;gap:12px;padding:16px 20px 12px;border-bottom:1px solid #f3f4f6}
+#mico{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+#mwrp{flex:1;min-width:0}
+#mnom{font-size:18px;font-weight:800;color:#111827;line-height:1.15}
+#mbgs{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+.mbg{font-size:10px;font-weight:600;padding:2px 10px;border-radius:16px}
+#mcls{width:30px;height:30px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#9ca3af;font-size:17px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+#mcls:hover{border-color:#2563EB;color:#2563EB}
+
+/* Modal body */
+#mbody{flex:1;overflow-y:auto;padding:16px 20px 24px}
+#mbody::-webkit-scrollbar{width:3px}
+#mbody::-webkit-scrollbar-thumb{background:#e5e7eb}
+
+/* Estilos para LQE */
+.sec-hdr{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#374151;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid #e5e7eb}
+
+.lqe-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lqe-card{background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px}
+.lqe-card-title{font-size:11px;font-weight:700;color:#374151;display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.lqe-card-title .lqe-icon{font-size:13px}
+.lqe-items{display:flex;flex-wrap:wrap;gap:3px}
+.lqe-item{font-size:10px;color:#4b5563;background:#fff;padding:2px 8px;border-radius:5px;border:1px solid #e5e7eb}
+.lqe-empty{font-size:11px;color:#9ca3af;font-style:italic}
+
+.no-lqe{font-size:13px;color:#9ca3af;font-style:italic;padding:12px;background:#f9fafb;border-radius:10px;text-align:center;border:1px dashed #e5e7eb}
+
+/* Perfil en modal */
+.mg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.mc{background:#f9fafb;border-radius:8px;padding:8px 10px}
+.mlbl{font-size:8px;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em}
+.mval{font-size:12px;color:#374151;line-height:1.3}
+.mb{background:#f9fafb;border-radius:8px;padding:8px 10px;margin-bottom:6px}
+.mq{font-size:12px;color:#6b7280;line-height:1.5;font-style:italic;border-left:2px solid #2563EB;padding-left:8px;margin-top:3px}
+.mcont{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.mcb{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:500;border:1px solid #e5e7eb;background:#f9fafb;color:#6b7280;text-decoration:none;transition:all .15s}
+.mcb:hover{background:#EFF6FF;border-color:#93C5FD;color:#1D4ED8}
+.mcb.wa{border-color:#d1fae5;background:#f0fdf4;color:#065f46}
+.mcb.wa:hover{background:#dcfce7}
+#mmapabox{width:100%;height:120px;background:#EFF6FF;border:1px solid #DBEAFE;border-radius:10px;overflow:hidden;margin-bottom:12px;display:flex;align-items:center;justify-content:center}
+#mmapabox svg{width:100%;height:100%}
+
+/* Divisor */
+.divider{height:1px;background:#e5e7eb;margin:14px 0}
+
+/* Responsive */
+@media(max-width:1100px){
+  #shell{grid-template-columns:280px 1fr}
+  .pcol:last-child{display:none}
+}
+@media(max-width:700px){
+  body{overflow:auto}
+  #shell{grid-template-columns:1fr;height:auto}
+  #mcol{height:320px;border-right:none;border-bottom:1px solid #e5e7eb}
+  .pcol{overflow:visible;min-height:300px;border-right:none}
+  .lista{overflow:visible}
+  .tagline{display:none}
+  #mbox{max-width:100%;border-radius:14px;max-height:95vh}
+  .mg,.lqe-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <span class="logo">🚌 <em>Chiva:</em> La Ruta Suroeste</span>
+  <span class="tagline">Iniciativas juveniles · Suroeste Antioqueño</span>
+  <div class="hdr-r">
+    <button id="btn-reset" onclick="resetAll()">✕ Limpiar</button>
+    <div class="hdr-stat"><span class="hdr-n" id="sn">0</span><span class="hdr-l">iniciativas</span></div>
+    <div class="hdr-stat"><span class="hdr-n" id="sm">0</span><span class="hdr-l">municipios</span></div>
+  </div>
+</div>
+
+<div id="shell">
+  <!-- Columna 1: Mapa -->
+  <div id="mcol">
+    <div id="mwrap">
+      <div id="tip"></div>
+      <svg id="msvg" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+    <div id="zbar">
+      <button class="zb on" data-z="Todos">Todos</button>
+      <button class="zb" data-z="Urbana">Urbana</button>
+      <button class="zb" data-z="Rural">Rural</button>
+      <button class="zb" data-z="Mixta">Mixta</button>
+    </div>
+    <div id="ley">
+      <div class="li"><div class="lsq" style="background:linear-gradient(90deg,#1D4ED8,#60A5FA)"></div>Provincia Cartama</div>
+      <div class="li"><div class="lsq" style="background:linear-gradient(90deg,#047857,#34D399)"></div>Provincia San Juan</div>
+      <div class="li"><div class="lsq" style="background:linear-gradient(90deg,#991B1B,#F87171)"></div>Prov. Penderisco-Sinifaná</div>
+    </div>
+  </div>
+
+  <!-- Columna 2: Listado de perfiles -->
+  <div class="pcol" id="pcol-perfil">
+    <div class="ptop">
+      <div class="sw"><input class="srch" id="srch-perfil" type="text" placeholder="Buscar perfiles…" autocomplete="off"><span class="si">⌕</span></div>
+      <div class="chips" id="chips-perfil"></div>
+    </div>
+    <div class="panel-header">
+      <span class="panel-title">📋 Perfiles</span>
+      <span class="panel-badge" id="badge-perfil">0</span>
+    </div>
+    <div class="cbar"><span id="ctxt-perfil">Cargando…</span></div>
+    <div class="lista" id="lista-perfil"></div>
+  </div>
+
+  <!-- Columna 3: Municipios (Lo que ya existe) -->
+  <div class="pcol" id="pcol-lqe">
+    <div class="ptop">
+      <div class="sw"><input class="srch" id="srch-lqe" type="text" placeholder="Buscar municipio…" autocomplete="off"><span class="si">⌕</span></div>
+    </div>
+    <div class="panel-header">
+      <span class="panel-title">🗂️ Lo que ya existe</span>
+      <span class="panel-badge" id="badge-lqe">0</span>
+    </div>
+    <div class="cbar"><span id="ctxt-lqe">Municipios con información</span></div>
+    <div class="lista" id="lista-lqe"></div>
+  </div>
+</div>
+
+<div id="modal">
+  <div id="mbox">
+    <div id="mhd">
+      <div id="mico"></div>
+      <div id="mwrp"><div id="mnom"></div><div id="mbgs"></div></div>
+      <button id="mcls" onclick="cerrar()">✕</button>
+    </div>
+    <div id="mbody"></div>
+  </div>
+</div>
+
+<script>
+const GEO    = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"cod":"05030","nombre":"Amag\u00e1"},"geometry":{"type":"Polygon","coordinates":[[[-75.66995039922539,5.998582007459833],[-75.69933003219947,5.981229434893793],[-75.76665835776508,5.999821476928837],[-75.74707193578236,6.069231767192997],[-75.67729530746891,6.087823809228041],[-75.66995039922539,5.998582007459833]]]}},{"type":"Feature","properties":{"cod":"05034","nombre":"Andes"},"geometry":{"type":"Polygon","coordinates":[[[-75.83643498607853,5.729617132686206],[-75.8095036558523,5.655248964546034],[-75.87315952729614,5.636656922510991],[-75.8707112245483,5.543696712335775],[-75.90621161439199,5.48172323888563],[-75.98333315094895,5.518907322955716],[-76.00904032980128,5.567246632246828],[-76.00659202705344,5.62302275835196],[-76.07392035261906,5.677559414988085],[-76.00291957293169,5.670122598174068],[-75.90621161439199,5.697390926492131],[-75.89274594927886,5.754406522066265],[-75.87315952729614,5.775477503039314],[-75.83643498607853,5.729617132686206]]]}},{"type":"Feature","properties":{"cod":"05036","nombre":"Angel\u00f3polis"},"geometry":{"type":"Polygon","coordinates":[[[-75.67974361021675,6.163431446837217],[-75.67239870197322,6.118810545953114],[-75.67729530746891,6.087823809228041],[-75.74707193578236,6.069231767192997],[-75.76665835776508,6.134923649050151],[-75.74707193578236,6.146078874271176],[-75.6944334267038,6.19441818356229],[-75.67974361021675,6.163431446837217]]]}},{"type":"Feature","properties":{"cod":"05091","nombre":"Betania"},"geometry":{"type":"Polygon","coordinates":[[[-75.89274594927886,5.754406522066265],[-75.90621161439199,5.697390926492131],[-76.00291957293169,5.670122598174068],[-76.07392035261906,5.677559414988085],[-76.08738601773217,5.6887146402091116],[-76.06535129300161,5.764322277818287],[-76.02005769216656,5.753167052597261],[-75.9551776693488,5.797787953481366],[-75.89274594927886,5.754406522066265]]]}},{"type":"Feature","properties":{"cod":"05093","nombre":"Betulia"},"geometry":{"type":"Polygon","coordinates":[[[-75.85479725668733,6.2464759012604105],[-75.84133159157422,6.165910385775222],[-75.99679881606208,6.077908053476017],[-76.04821317376673,6.261349534888446],[-76.0041437243056,6.284899454799499],[-75.93314294461823,6.21672863400434],[-75.85479725668733,6.2464759012604105]]]}},{"type":"Feature","properties":{"cod":"05145","nombre":"Caramanta"},"geometry":{"type":"Polygon","coordinates":[[[-75.58058734892921,5.605670185785918],[-75.57079413793785,5.543696712335775],[-75.57691489480744,5.516428384017711],[-75.6405707662513,5.530062548176742],[-75.70422663769516,5.53749936499076],[-75.71401984868652,5.547415120742782],[-75.67607115609499,5.598233368971901],[-75.58058734892921,5.605670185785918]]]}},{"type":"Feature","properties":{"cod":"05101","nombre":"Ciudad Bol\u00edvar"},"geometry":{"type":"Polygon","coordinates":[[[-75.91478067400942,5.863479835338518],[-75.91478067400942,5.847366732241481],[-75.9551776693488,5.797787953481366],[-76.02005769216656,5.753167052597261],[-76.06535129300161,5.764322277818287],[-76.09840338009745,5.849845671179487],[-76.05433393063633,5.931650656133677],[-75.91478067400942,5.863479835338518]]]}},{"type":"Feature","properties":{"cod":"05209","nombre":"Concordia"},"geometry":{"type":"Polygon","coordinates":[[[-75.84133159157422,6.165910385775222],[-75.85479725668733,6.10021850391807],[-75.84133159157422,6.008497763211857],[-75.84867649981774,5.956440045513736],[-75.9441603069835,5.9787504959557864],[-75.94293615560959,6.04444237781294],[-75.998022967436,6.069231767192997],[-75.99679881606208,6.077908053476017],[-75.84133159157422,6.165910385775222]]]}},{"type":"Feature","properties":{"cod":"05282","nombre":"Fredonia"},"geometry":{"type":"Polygon","coordinates":[[[-75.61363943602505,5.9787504959557864],[-75.63567416075563,5.966355801265758],[-75.61976019289466,5.801506361888375],[-75.6405707662513,5.761843338880283],[-75.66505379372971,5.800266892419371],[-75.76053760089547,5.873395591090542],[-75.77522741738252,5.88083240790456],[-75.69933003219947,5.981229434893793],[-75.66995039922539,5.998582007459833],[-75.61363943602505,5.9787504959557864]]]}},{"type":"Feature","properties":{"cod":"05353","nombre":"Hispania"},"geometry":{"type":"Polygon","coordinates":[[[-75.87315952729614,5.775477503039314],[-75.89274594927886,5.754406522066265],[-75.9551776693488,5.797787953481366],[-75.91478067400942,5.847366732241481],[-75.87315952729614,5.775477503039314]]]}},{"type":"Feature","properties":{"cod":"05364","nombre":"Jard\u00edn"},"geometry":{"type":"Polygon","coordinates":[[[-75.80705535310445,5.65400949507703],[-75.75196854127805,5.627980636227971],[-75.72993381654747,5.563528223839821],[-75.86826292180046,5.49039952516865],[-75.90621161439199,5.48172323888563],[-75.8707112245483,5.543696712335775],[-75.87315952729614,5.636656922510991],[-75.8095036558523,5.655248964546034],[-75.80705535310445,5.65400949507703]]]}},{"type":"Feature","properties":{"cod":"05368","nombre":"Jeric\u00f3"},"geometry":{"type":"Polygon","coordinates":[[[-75.66505379372971,5.800266892419371],[-75.74462363303452,5.733335541093215],[-75.80705535310445,5.65400949507703],[-75.8095036558523,5.655248964546034],[-75.83643498607853,5.729617132686206],[-75.82052101821758,5.821337873392421],[-75.76053760089547,5.873395591090542],[-75.66505379372971,5.800266892419371]]]}},{"type":"Feature","properties":{"cod":"05390","nombre":"La Pintada"},"geometry":{"type":"Polygon","coordinates":[[[-75.56956998656393,5.724659254810195],[-75.59894961953802,5.681277823395094],[-75.64179491762522,5.75688546100427],[-75.6405707662513,5.761843338880283],[-75.61976019289466,5.801506361888375],[-75.56956998656393,5.724659254810195]]]}},{"type":"Feature","properties":{"cod":"05467","nombre":"Montebello"},"geometry":{"type":"Polygon","coordinates":[[[-75.56222507832041,5.975032087548778],[-75.50836241786791,5.960158453920744],[-75.48143108764168,5.934129595071683],[-75.48632769313735,5.870916652152536],[-75.53406959672024,5.8597614269315095],[-75.56222507832041,5.975032087548778]]]}},{"type":"Feature","properties":{"cod":"05576","nombre":"Pueblorrico"},"geometry":{"type":"Polygon","coordinates":[[[-75.88540104103534,5.906861266753619],[-75.88662519240926,5.864719304807521],[-75.82052101821758,5.821337873392421],[-75.83643498607853,5.729617132686206],[-75.87315952729614,5.775477503039314],[-75.91478067400942,5.847366732241481],[-75.91478067400942,5.863479835338518],[-75.88540104103534,5.906861266753619]]]}},{"type":"Feature","properties":{"cod":"05642","nombre":"Salgar"},"geometry":{"type":"Polygon","coordinates":[[[-75.998022967436,6.069231767192997],[-75.94293615560959,6.04444237781294],[-75.9441603069835,5.9787504959557864],[-75.84867649981774,5.956440045513736],[-75.85602140806125,5.937848003478692],[-75.88540104103534,5.906861266753619],[-75.91478067400942,5.863479835338518],[-76.05433393063633,5.931650656133677],[-76.09717922872353,6.0035398853358455],[-75.998022967436,6.069231767192997]]]}},{"type":"Feature","properties":{"cod":"05679","nombre":"Santa B\u00e1rbara"},"geometry":{"type":"Polygon","coordinates":[[[-75.5916047112945,6.00601882427385],[-75.56222507832041,5.975032087548778],[-75.53406959672024,5.8597614269315095],[-75.5561043214508,5.724659254810195],[-75.56956998656393,5.724659254810195],[-75.61976019289466,5.801506361888375],[-75.63567416075563,5.966355801265758],[-75.61363943602505,5.9787504959557864],[-75.5916047112945,6.00601882427385]]]}},{"type":"Feature","properties":{"cod":"05789","nombre":"T\u00e1mesis"},"geometry":{"type":"Polygon","coordinates":[[[-75.6405707662513,5.761843338880283],[-75.64179491762522,5.75688546100427],[-75.67607115609499,5.598233368971901],[-75.71401984868652,5.547415120742782],[-75.72993381654747,5.563528223839821],[-75.75196854127805,5.627980636227971],[-75.80705535310445,5.65400949507703],[-75.74462363303452,5.733335541093215],[-75.66505379372971,5.800266892419371],[-75.6405707662513,5.761843338880283]]]}},{"type":"Feature","properties":{"cod":"05792","nombre":"Tarso"},"geometry":{"type":"Polygon","coordinates":[[[-75.77522741738252,5.88083240790456],[-75.76053760089547,5.873395591090542],[-75.82052101821758,5.821337873392421],[-75.88662519240926,5.864719304807521],[-75.88540104103534,5.906861266753619],[-75.85602140806125,5.937848003478692],[-75.77522741738252,5.88083240790456]]]}},{"type":"Feature","properties":{"cod":"05809","nombre":"Titirib\u00ed"},"geometry":{"type":"Polygon","coordinates":[[[-75.74707193578236,6.069231767192997],[-75.76665835776508,5.999821476928837],[-75.84133159157422,6.008497763211857],[-75.85479725668733,6.10021850391807],[-75.76665835776508,6.134923649050151],[-75.74707193578236,6.069231767192997]]]}},{"type":"Feature","properties":{"cod":"05847","nombre":"Urrao"},"geometry":{"type":"Polygon","coordinates":[[[-76.16205925154131,6.592287883112215],[-76.05800638475809,6.506764489751015],[-76.04209241689713,6.377859664974716],[-75.98822975644464,6.344393989311637],[-76.0041437243056,6.284899454799499],[-76.04821317376673,6.261349534888446],[-75.99679881606208,6.077908053476017],[-75.998022967436,6.069231767192997],[-76.09717922872353,6.0035398853358455],[-76.15961094879347,6.0035398853358455],[-76.19143888451539,6.059316011440975],[-76.2098011551242,6.184502427810266],[-76.2465256963418,6.204333939314312],[-76.37750989335126,6.1931787140932855],[-76.44483821891687,6.168389324713228],[-76.52318390684776,6.219207572942347],[-76.52440805822168,6.382817542850727],[-76.56358090218713,6.566259024263154],[-76.52318390684776,6.587330005236204],[-76.48401106288232,6.496848733998993],[-76.3799581960991,6.5935273525812175],[-76.31752647602917,6.505525020282013],[-76.22693927435908,6.571216902139167],[-76.16205925154131,6.592287883112215]]]}},{"type":"Feature","properties":{"cod":"05856","nombre":"Valpara\u00edso"},"geometry":{"type":"Polygon","coordinates":[[[-75.59894961953802,5.681277823395094],[-75.58058734892921,5.605670185785918],[-75.67607115609499,5.598233368971901],[-75.64179491762522,5.75688546100427],[-75.59894961953802,5.681277823395094]]]}},{"type":"Feature","properties":{"cod":"05861","nombre":"Venecia"},"geometry":{"type":"Polygon","coordinates":[[[-75.76665835776508,5.999821476928837],[-75.69933003219947,5.981229434893793],[-75.77522741738252,5.88083240790456],[-75.85602140806125,5.937848003478692],[-75.84867649981774,5.956440045513736],[-75.84133159157422,6.008497763211857],[-75.76665835776508,5.999821476928837]]]}}]};
+const PROV   = {"Caramanta": {"p": "cartama", "label": "Provincia Cartama", "c": "#4A8FE7"}, "Valparaíso": {"p": "cartama", "label": "Provincia Cartama", "c": "#3B82F6"}, "La Pintada": {"p": "cartama", "label": "Provincia Cartama", "c": "#60A5FA"}, "Santa Bárbara": {"p": "cartama", "label": "Provincia Cartama", "c": "#2563EB"}, "Montebello": {"p": "cartama", "label": "Provincia Cartama", "c": "#3B82F6"}, "Fredonia": {"p": "cartama", "label": "Provincia Cartama", "c": "#1D4ED8"}, "Venecia": {"p": "cartama", "label": "Provincia Cartama", "c": "#5598F4"}, "Tarso": {"p": "cartama", "label": "Provincia Cartama", "c": "#1E56D0"}, "Pueblorrico": {"p": "cartama", "label": "Provincia Cartama", "c": "#6BA8F8"}, "Jericó": {"p": "cartama", "label": "Provincia Cartama", "c": "#2A6FE8"}, "Támesis": {"p": "cartama", "label": "Provincia Cartama", "c": "#4888F0"}, "Jardín": {"p": "sanjuan", "label": "Provincia San Juan", "c": "#059669"}, "Andes": {"p": "sanjuan", "label": "Provincia San Juan", "c": "#10B981"}, "Ciudad Bolívar": {"p": "sanjuan", "label": "Provincia San Juan", "c": "#047857"}, "Hispania": {"p": "sanjuan", "label": "Provincia San Juan", "c": "#34D399"}, "Betania": {"p": "sanjuan", "label": "Provincia San Juan", "c": "#065F46"}, "Salgar": {"p": "sanjuan", "label": "Provincia San Juan", "c": "#6EE7B7"}, "Amagá": {"p": "penderisco", "label": "Prov. Penderisco-Sinifaná", "c": "#DC2626"}, "Angelópolis": {"p": "penderisco", "label": "Prov. Penderisco-Sinifaná", "c": "#EF4444"}, "Betulia": {"p": "penderisco", "label": "Prov. Penderisco-Sinifaná", "c": "#B91C1C"}, "Concordia": {"p": "penderisco", "label": "Prov. Penderisco-Sinifaná", "c": "#F87171"}, "Titiribí": {"p": "penderisco", "label": "Prov. Penderisco-Sinifaná", "c": "#991B1B"}, "Urrao": {"p": "penderisco", "label": "Prov. Penderisco-Sinifaná", "c": "#E05252"}};
+const INIX   = [{"id": 1, "nombre": "Colectivo La Quinta", "tipo": "Colectivo", "municipio": "Amagá", "zona": "Mixta", "lugar": "Reserva La María, Parque Principal", "integrantes": "12", "areas": ["Arte y cultura", "Medio ambiente y sostenibilidad", "Política y participación ciudadana", "Enfoque de género y diversidad"], "contacto": "Denilson García Gómez", "email": "denilsongarciagomez3@gmail.com", "celular": "3122212190", "redes": "@untaldenilson", "pub": "tel", "año": "2021", "constituida": "No, grupo informal", "desafio": "Que algunos miembros ya no habitan el municipio y otros estudian y/o trabajan y no es sencillo coordinar tiempos.", "simbolo": "Montaña, río, sol. Porque nos conectan a todos en la diversidad de nuestros territorios.", "chiva": "Sí", "visita": "Sí"}, {"id": 2, "nombre": "Guardianes de La María", "tipo": "Colectivo", "municipio": "Amagá", "zona": "Rural", "lugar": "Reserva La María - Camilo C", "integrantes": "12", "areas": ["Medio ambiente y sostenibilidad"], "contacto": "Ana María Gómez Londoño", "email": "soyamgomez@gmail.com", "celular": "3117603847", "redes": "@colecticolaquinta", "pub": "tel", "año": "2023", "constituida": "No, grupo informal", "desafio": "Acciones específicas de la alcaldía de turno frente a las problemáticas de la Reserva La María.", "simbolo": "El sol, la comida antioqueña, la fiesta y la berraquera.", "chiva": "Tal vez", "visita": "Sí"}, {"id": 3, "nombre": "Ménades y Sátiros", "tipo": "Colectivo", "municipio": "Amagá", "zona": "Mixta", "lugar": "Casa de la Cultura Amagá / Auditorios IENSA-IESF", "integrantes": "17", "areas": ["Arte y cultura"], "contacto": "Jefferson Andrés Salinas Betancur", "email": "salinas.work444@gmail.com", "celular": "3232510619", "redes": "@menades_y_satiros2026", "pub": "tel", "año": "2025", "constituida": "No, grupo informal", "desafio": "Acceso a referentes de elencos profesionales que motiven la creación artística teatral.", "simbolo": "La montaña, el agua y la tierra.", "chiva": "Sí", "visita": "Sí"}, {"id": 4, "nombre": "Emmanuel Ospina", "tipo": "Líder", "municipio": "Amagá", "zona": "Mixta", "lugar": "Vereda Camilo C", "integrantes": "1", "areas": ["Arte y cultura", "Medio ambiente y sostenibilidad", "Política y participación ciudadana"], "contacto": "Emmanuel Ospina Vásquez", "email": "", "celular": "", "redes": "@pankgolo", "pub": "no", "año": "2005", "constituida": "No, grupo informal", "desafio": "El orden público.", "simbolo": "El café, el aguacate, el carbón, la panela y Piedra Pelona.", "chiva": "Sí", "visita": "Sí"}, {"id": 5, "nombre": "Alma", "tipo": "Líder", "municipio": "Urrao", "zona": "Mixta", "lugar": "Casa de juventud de Urrao", "integrantes": "—", "areas": ["Arte y cultura", "Medio ambiente y sostenibilidad", "Política y participación ciudadana", "Enfoque de género y diversidad"], "contacto": "Isabella Velásquez Villa", "email": "almadefuego000@gmail.com", "celular": "3137589039", "redes": "@__almadefuego", "pub": "nombre", "año": "2021", "constituida": "—", "desafio": "Subestimación por cuestiones de género, casi nula voluntad política y ocupaciones mixtas que reducen el tiempo.", "simbolo": "El sol, el río, las montañas, los guayacanes, carboneros, cedros, yarumos y samanes.", "chiva": "Sí", "visita": "Sí"}, {"id": 6, "nombre": "Colectivo Jóvenes Artistas del Sol", "tipo": "Colectivo", "municipio": "Urrao", "zona": "Mixta", "lugar": "Casa de juventud de Urrao y veredas del Suroeste", "integrantes": "25", "areas": ["Arte y cultura", "Medio ambiente y sostenibilidad", "Política y participación ciudadana", "Deporte y recreación", "Enfoque de género y diversidad", "Emprendimiento y economía local"], "contacto": "Isabella Velásquez Villa", "email": "jovenesartistasdelsol@gmail.com", "celular": "3137589039", "redes": "@jovenesartistasol", "pub": "tel", "año": "2021", "constituida": "No, grupo informal", "desafio": "Dificultades internas en la toma de decisiones y falta de organización concreta.", "simbolo": "El sol, la bicicleta, los murales, los ríos, las ollas comunitarias, el café y los atardeceres.", "chiva": "Sí", "visita": "Sí"}, {"id": 7, "nombre": "Ana Cristina Ruiz Jaramillo", "tipo": "Líder", "municipio": "Urrao", "zona": "Urbana", "lugar": "Casa de juventud, Concejo (CMJ)", "integrantes": "20", "areas": ["Arte y cultura", "Política y participación ciudadana", "Enfoque de género y diversidad"], "contacto": "Ana Cristina Ruiz Jaramillo", "email": "ancruiz200@gmail.com", "celular": "3215978364", "redes": "—", "pub": "tel", "año": "2021", "constituida": "No, grupo informal", "desafio": "Sostener la participación constante de los jóvenes y fortalecer recursos para mayor continuidad.", "simbolo": "Las montañas, el Páramo del Sol, el arte y el sentido comunitario del Suroeste.", "chiva": "Tal vez", "visita": "Sí"}, {"id": 8, "nombre": "JADES — Jóvenes Artistas del Sol", "tipo": "Colectivo", "municipio": "Urrao", "zona": "Urbana", "lugar": "Casa de la juventud — parque de los chorritos", "integrantes": "20", "areas": ["Arte y cultura"], "contacto": "Jerónimo Rueda Seguro", "email": "jeronimoruedasgo@gmail.com", "celular": "3105185732", "redes": "JADES", "pub": "nombre", "año": "2020-21", "constituida": "Sí, con personería jurídica", "desafio": "El sentido de pertenencia por defender desde el arte nuestros derechos.", "simbolo": "No a la minería / Arte del pueblo y para el pueblo.", "chiva": "No", "visita": "Sí"}, {"id": 9, "nombre": "Emanuel Camilo Álvarez", "tipo": "Colectivo", "municipio": "Urrao", "zona": "Rural", "lugar": "Casa juvenil", "integrantes": "10", "areas": ["Arte y cultura"], "contacto": "Emanuel Camilo Álvarez", "email": "alvarezmorenoemanuelcamilo7@gmail.com", "celular": "3136987033", "redes": "Emanuel Camilo", "pub": "nombre", "año": "2025", "constituida": "No, grupo informal", "desafio": "Las responsabilidades del espacio.", "simbolo": "Con la luna, porque es en la noche donde las cosas fluyen.", "chiva": "Sí", "visita": "Sí"}, {"id": 10, "nombre": "Valentina Mendoza Salazar", "tipo": "Líder", "municipio": "Urrao", "zona": "Urbana", "lugar": "Calle 16 #26-33 San Judas", "integrantes": "1", "areas": ["Arte y cultura", "Política y participación ciudadana"], "contacto": "Valentina Mendoza", "email": "misteriosa0170@gmail.com", "celular": "3222353497", "redes": "@valmedzs", "pub": "tel", "año": "2023", "constituida": "No, grupo informal", "desafio": "La falta de interés juvenil y propuestas que no se ejecutan del todo bien.", "simbolo": "El café, las montañas y el verde.", "chiva": "Sí", "visita": "Sí"}, {"id": 11, "nombre": "Sendero — Comunidad de mujeres viajeras", "tipo": "Líder", "municipio": "Fredonia", "zona": "Mixta", "lugar": "Hostales, ecohoteles, montañas", "integrantes": "1", "areas": ["Arte y cultura", "Medio ambiente y sostenibilidad", "Enfoque de género y diversidad", "Emprendimiento y economía local"], "contacto": "Sara Paulina Hurtado Martínez", "email": "rollerskating158@gmail.com", "celular": "3152643136", "redes": "@Sendero_Comunidaddemujeres", "pub": "tel", "año": "2025", "constituida": "No, grupo informal", "desafio": "Comunicación y articulación con otros proyectos.", "simbolo": "Con los cerros.", "chiva": "Sí", "visita": "Sí"}, {"id": 12, "nombre": "Carlos Arturo Valencia Arango", "tipo": "Líder", "municipio": "Fredonia", "zona": "Urbana", "lugar": "Casa de la cultura", "integrantes": "50", "areas": ["Arte y cultura"], "contacto": "Carlos Arturo Valencia Arango", "email": "Carlosarturovalenciaarango@gmail.com", "celular": "3004713340", "redes": "—", "pub": "tel", "año": "2014", "constituida": "No, grupo informal", "desafio": "El acompañamiento estatal y recursos.", "simbolo": "El café, insignia de mi municipio, y sus ríos por la libertad.", "chiva": "Sí", "visita": "Sí"}, {"id": 13, "nombre": "Asomuf", "tipo": "Colectivo", "municipio": "Fredonia", "zona": "Mixta", "lugar": "—", "integrantes": "20", "areas": ["Arte y cultura", "Enfoque de género y diversidad", "Emprendimiento y economía local"], "contacto": "Valentina Vergara Trujillo", "email": "valentina.vergara577@gmail.com", "celular": "3192493652", "redes": "Ig: pucherulitos", "pub": "tel", "año": "1995 (activa desde 2020)", "constituida": "Sí, con personería jurídica", "desafio": "La autogestión y la difícil convocatoria en el municipio.", "simbolo": "Las montañas, el café y el agua fría.", "chiva": "Sí", "visita": "Sí"}, {"id": 14, "nombre": "Alejandra Palacio Restrepo", "tipo": "Líder", "municipio": "Fredonia", "zona": "Mixta", "lugar": "Café Luma Llena, vereda El Zancudo", "integrantes": "1", "areas": ["Arte y cultura"], "contacto": "Alejandra Palacio Restrepo", "email": "alejapalacio464@gmail.com", "celular": "3192036553", "redes": "@conversamepues", "pub": "nombre", "año": "2021", "constituida": "No, grupo informal", "desafio": "Falta de presupuesto para actividades sociales y comunitarias.", "simbolo": "El café, el verde de las montañas y el río.", "chiva": "Sí", "visita": "Sí"}, {"id": 15, "nombre": "Fundación Toques de Vida", "tipo": "Colectivo", "municipio": "Fredonia", "zona": "Rural", "lugar": "Corregimiento de Marsella", "integrantes": "36", "areas": ["Arte y cultura", "Medio ambiente y sostenibilidad", "Emprendimiento y economía local"], "contacto": "Lesty Gabriela Martínez González", "email": "fundacionfuntovi@gmail.com", "celular": "3208130749", "redes": "Fundación Toques de Vida", "pub": "tel", "año": "2019", "constituida": "Sí, con personería jurídica", "desafio": "Consolidar la propuesta en escuelas y colegios y convertirla en política pública.", "simbolo": "Café, aves, montañas, pujanza.", "chiva": "Sí", "visita": "Sí"}, {"id": 16, "nombre": "Edwin Arboleda Villa", "tipo": "Líder", "municipio": "Fredonia", "zona": "Mixta", "lugar": "Zona urbana y rural", "integrantes": "7 (CMJ)", "areas": ["Arte y cultura", "Medio ambiente y sostenibilidad", "Política y participación ciudadana"], "contacto": "Edwin Arboleda Villa", "email": "edwinarvi6@gmail.com", "celular": "3009625554", "redes": "@edwin49577", "pub": "tel", "año": "2026", "constituida": "Sí, con personería jurídica", "desafio": "La participación juvenil es una de las grandes barreras.", "simbolo": "La bandera de Antioquia.", "chiva": "Sí", "visita": "Sí"}, {"id": 17, "nombre": "Mariana Vélez Ángel", "tipo": "Líder", "municipio": "Fredonia", "zona": "Urbana", "lugar": "—", "integrantes": "—", "areas": ["Política y participación ciudadana", "Enfoque de género y diversidad"], "contacto": "Mariana Vélez Ángel", "email": "mariana.vangel@udea.edu.co", "celular": "3136751214", "redes": "@Mari_angel38", "pub": "tel", "año": "2019", "constituida": "—", "desafio": "La baja participación juvenil.", "simbolo": "Las montañas, el color azul.", "chiva": "Sí", "visita": "Sí"}, {"id": 18, "nombre": "Guadalupe Valderrama Piedrahita", "tipo": "Líder", "municipio": "Fredonia", "zona": "Mixta", "lugar": "—", "integrantes": "—", "areas": ["Medio ambiente y sostenibilidad", "Política y participación ciudadana", "Emprendimiento y economía local"], "contacto": "Guadalupe Valderrama Piedrahita", "email": "oradoraguadalupevalderrama@gmail.com", "celular": "3106290067", "redes": "@guadalupevalderrama.p", "pub": "tel", "año": "2018", "constituida": "No, grupo informal", "desafio": "Articulación con actores para financiar proyectos.", "simbolo": "Con las montañas y el agua.", "chiva": "Sí", "visita": "Sí"}, {"id": 19, "nombre": "Katherine Machado Lora", "tipo": "Líder", "municipio": "Andes", "zona": "Rural", "lugar": "Vereda Alto Cañaveral", "integrantes": "3", "areas": ["Emprendimiento y economía local"], "contacto": "Katherine Machado Lora", "email": "katerinemachado2018@gmail.com", "celular": "3145387905", "redes": "N/A", "pub": "nombre", "año": "2025", "constituida": "No, grupo informal", "desafio": "Lograr mayor participación y compromiso de los jóvenes.", "simbolo": "El café, las montañas y la cultura campesina del Suroeste.", "chiva": "Sí", "visita": "Sí"}, {"id": 20, "nombre": "BioceUdeA", "tipo": "Colectivo", "municipio": "Andes", "zona": "Rural", "lugar": "Campus Suroeste UdeA", "integrantes": "8", "areas": ["Arte y cultura", "Medio ambiente y sostenibilidad", "Apropiación de territorio natural"], "contacto": "Carlos Daniel Arenas Villada", "email": "cdaniel.arenas@udea.edu.co", "celular": "3223083330", "redes": "BIOCEUDEA (Instagram)", "pub": "nombre", "año": "Hace 3 años", "constituida": "Sí, con personería jurídica", "desafio": "Adaptar a las personas a un nuevo pensamiento de conservación con comunidades rurales.", "simbolo": "Logo del municipio y la UdeA.", "chiva": "Tal vez", "visita": "Sí"}, {"id": 21, "nombre": "Andrés Quintero Urrego", "tipo": "Líder", "municipio": "Andes", "zona": "Rural", "lugar": "Buenos Aires", "integrantes": "2", "areas": ["Medio ambiente y sostenibilidad", "Deporte y recreación", "Emprendimiento y economía local"], "contacto": "Andrés Quintero Urrego", "email": "aq0768051@gmail.com", "celular": "3011604815", "redes": "N/A", "pub": "nombre", "año": "Hace 3 años", "constituida": "No, grupo informal", "desafio": "Lograr mayor participación y permanencia de los jóvenes.", "simbolo": "El café, las montañas y la cultura campesina del Suroeste.", "chiva": "Sí", "visita": "Sí"}, {"id": 22, "nombre": "Mujeres Sembrando Futuro", "tipo": "Líder", "municipio": "Andes", "zona": "Rural", "lugar": "Vereda La Chaparrala", "integrantes": "15", "areas": ["Medio ambiente y sostenibilidad", "Emprendimiento y economía local"], "contacto": "María Fernanda González Restrepo", "email": "rendonrendonmariaismelda@gmail.com", "celular": "311 4050463", "redes": "No aplica", "pub": "nombre", "año": "2023", "constituida": "No, grupo informal", "desafio": "Mayor participación de jóvenes y conseguir recursos.", "simbolo": "Las montañas, los cafetales y la cultura campesina.", "chiva": "Tal vez", "visita": "No"}, {"id": 23, "nombre": "Jóvenes Rurales por el Cambio", "tipo": "Líder", "municipio": "Andes", "zona": "Rural", "lugar": "Casa de la Cultura de Buenos Aires", "integrantes": "18", "areas": ["Medio ambiente y sostenibilidad", "Política y participación ciudadana", "Emprendimiento y economía local"], "contacto": "Juan David Restrepo Cardona", "email": "jv6518596@gmail.com", "celular": "N/A", "redes": "N/A", "pub": "no", "año": "2022", "constituida": "No, grupo informal", "desafio": "Mantener participación constante y generar oportunidades en zonas rurales.", "simbolo": "El café, las montañas y la cultura campesina.", "chiva": "Sí", "visita": "No"}, {"id": 24, "nombre": "Ecos del Sol", "tipo": "Colectivo", "municipio": "Andes", "zona": "Urbana", "lugar": "Andes", "integrantes": "6", "areas": ["Arte y cultura"], "contacto": "Isabella Vélez Ledesma", "email": "ecosdelsol1@gmail.com", "celular": "3217535603", "redes": "@ecos_del_sol", "pub": "tel", "año": "2020", "constituida": "No, grupo informal", "desafio": "Escenarios de participación, convocatorias, estímulos.", "simbolo": "Río San Juan, Citará, el amarillo.", "chiva": "Tal vez", "visita": "Sí"}, {"id": 25, "nombre": "Vivero Paraíso Escondido", "tipo": "Líder", "municipio": "Andes", "zona": "Rural", "lugar": "Vereda Alto Cañaveral", "integrantes": "4", "areas": ["Medio ambiente y sostenibilidad", "Emprendimiento y economía local"], "contacto": "Kevin Alexander Vélez Rendón", "email": "kevinvelezrendon4@gmail.com", "celular": "3104373806", "redes": "Mi vivero paraíso escondido", "pub": "nombre", "año": "2021", "constituida": "No, grupo informal", "desafio": "Ampliar el alcance del emprendimiento y fortalecer la participación de jóvenes.", "simbolo": "Las montañas, los cafetales, las aves y la riqueza natural del Suroeste.", "chiva": "Sí", "visita": "Sí"}, {"id": 26, "nombre": "Corporación Escuela de Música de Jardín", "tipo": "Líder", "municipio": "Jardín", "zona": "Mixta", "lugar": "Cr 2 #8-2", "integrantes": "Más de 100", "areas": ["Arte y cultura"], "contacto": "Emiliana Jaramillo Parra", "email": "emijaramillop@gmail.com", "celular": "3197262300", "redes": "escuelamusicajardin", "pub": "tel", "año": "1976", "constituida": "Sí, con personería jurídica", "desafio": "La participación.", "simbolo": "Las flores y la biodiversidad, la música parrandera, andina y campesina.", "chiva": "Sí", "visita": "Sí"}, {"id": 27, "nombre": "Estudiantina Ecos del Jardín", "tipo": "Colectivo", "municipio": "Jardín", "zona": "Mixta", "lugar": "Escuela de Música Jardín", "integrantes": "16", "areas": ["Arte y cultura"], "contacto": "Víctor Daniel Bustamante Marín", "email": "victordaniel9709@gmail.com", "celular": "3206630713", "redes": "victordaniel9709", "pub": "tel", "año": "2024", "constituida": "Sí, con personería jurídica", "desafio": "El cambio generacional dentro del proceso formativo.", "simbolo": "Montañas, naturaleza, pájaros, arquitectura.", "chiva": "Sí", "visita": "Sí"}, {"id": 28, "nombre": "Reserva Los Guácharos", "tipo": "Líder", "municipio": "Jardín", "zona": "Rural", "lugar": "Cra 8 #13-331 Salida La Herrera", "integrantes": "4", "areas": ["Medio ambiente y sostenibilidad"], "contacto": "Samantha Giraldo Cardona", "email": "s.giraldo1404@gmail.com", "celular": "3225085061", "redes": "Reserva Los Guácharos", "pub": "tel", "año": "2024", "constituida": "No, grupo informal", "desafio": "La falta de interés de la comunidad en la conservación.", "simbolo": "Las montañas y las aves.", "chiva": "Sí", "visita": "Sí"}, {"id": 29, "nombre": "Isla de Pascua Hostel", "tipo": "Colectivo", "municipio": "Jardín", "zona": "Rural", "lugar": "Verdún, Jardín", "integrantes": "5", "areas": ["Medio ambiente y sostenibilidad", "Emprendimiento y economía local"], "contacto": "Maria Isabel Jiménez", "email": "mijimenezg3@gmail.com", "celular": "3042453102", "redes": "@isladepascuajardin", "pub": "tel", "año": "2024", "constituida": "Sí, con personería jurídica", "desafio": "Mejorar articulación de actores locales para mayor impacto social y ambiental.", "simbolo": "Jardín es muy turístico y tiene gran potencial en el agro.", "chiva": "Sí", "visita": "Sí"}, {"id": 30, "nombre": "CMJ Jardín", "tipo": "Líder", "municipio": "Jardín", "zona": "Urbana", "lugar": "Recinto del concejo", "integrantes": "9", "areas": ["Arte y cultura", "Medio ambiente y sostenibilidad", "Política y participación ciudadana", "Deporte y recreación", "Enfoque de género y diversidad", "Emprendimiento y economía local"], "contacto": "Emiliana Jaramillo Parra", "email": "emijaramillop@gmail.com", "celular": "3197262300", "redes": "Red de jóvenes jardín", "pub": "tel", "año": "2026", "constituida": "Sí, con personería jurídica", "desafio": "Presupuesto y tiempo.", "simbolo": "Con el café que es motivo de transformación.", "chiva": "Sí", "visita": "Sí"}, {"id": 31, "nombre": "Asociación de Jóvenes Indígenas Dai Iuja", "tipo": "Colectivo", "municipio": "Jardín", "zona": "Rural", "lugar": "Resguardo indígena de Karmata Rua", "integrantes": "16", "areas": ["Arte y cultura", "Medio ambiente y sostenibilidad", "Política y participación ciudadana", "Emprendimiento y economía local", "Saberes ancestrales"], "contacto": "Juan Andrés Cortés Tascón", "email": "juanandrescc23@gmail.com", "celular": "3157910076", "redes": "Dai_iuja", "pub": "nombre", "año": "2023", "constituida": "Sí, con personería jurídica", "desafio": "Llegar a los jóvenes que puedan apropiar los temas de liderazgo dentro del territorio.", "simbolo": "Mi pueblo que es multicultural, de conocimiento ancestral.", "chiva": "Sí", "visita": "Sí"}, {"id": 32, "nombre": "Saltamontes Trail", "tipo": "Colectivo", "municipio": "Jardín", "zona": "Mixta", "lugar": "Parque principal de Jardín", "integrantes": "3", "areas": ["Deporte y recreación"], "contacto": "Lisbeth Marín Jaramillo", "email": "Lisbethmarinjaramillo@gmail.com", "celular": "3206111930", "redes": "@Saltamontes_trail", "pub": "tel", "año": "2025", "constituida": "No, grupo informal", "desafio": "Sostener en el tiempo la iniciativa y generar articulaciones para financiarla.", "simbolo": "La montaña y el río.", "chiva": "Sí", "visita": "Sí"}];
+const LQE    = {"Fredonia": {"Cultura": ["Casa de la Cultura", "Grupos de danza", "Teatro municipal", "Escuela de música", "Festivales culturales"], "Ambiente": ["Caficultura", "Ganadería", "Avicultura", "Avistamiento de aves", "Porcicultura", "Minería a pequeña escala"], "Emprendimiento": ["Mercado campesino (zona urbana)", "Fundación Oro Molido", "Colectivo cafetero La Planta", "Cámara de Comercio", "Provincia Cartama", "Fundación Toques de Vida (vereda Marsella)"], "Enfoque de Género": ["Política Pública de mujeres", "Programa radial", "ASOMUF — Asociación de Mujeres Unidas de Fredonia", "Espacios de escucha", "Enlace municipal de género"], "Participación Política e Identidad": ["Coordinación de juventudes de Fredonia", "Secretaría de Bienestar Social", "Articulación con la Casa de la Cultura"]}, "Jardín": {"Cultura": ["Grupos artísticos de adultos (Resguardo Karmata Rúa)", "Escuela de Música Jardín", "Centro de Historia y Patrimonio", "Danzalma", "Teatro Municipal", "COMFENALCO"], "Ambiente": ["Colectivos de turismo (Resguardo Karmata Rúa)"], "Emprendimiento": ["Trabajo artesanal en cerámica (Resguardo Karmata Rúa)"], "Enfoque de Género": ["Colectivos de mujeres (Resguardo Karmata Rúa)"], "Participación Política e Identidad": ["Asociación de Jóvenes Indígenas / Asociación DAI IUJA (Resguardo Karmata Rúa)", "Juntas de Acción Comunal (Vereda La Arboleda y municipio)", "CMJ — Plataforma Juvenil", "Desfile de la tercera edad (Vereda La Arboleda)", "Tejido social activo del Resguardo Karmata Rúa"]}, "Urrao": {"Cultura": ["JADES (Jóvenes Artistas del Sol)", "Casa de la Cultura (danza, teatro, literatura, artes plásticas)", "Escuela de Música", "Festival Artistas del Sol", "Turismo cultural", "Grupos independientes", "Fiestas y eventos culturales", "Casa de la Juventud", "Expo Tattoo"], "Ambiente": ["Procesos restaurativos ambientales", "Mesa ambiental", "PGIRS fortalecidos", "Fundaciones, organizaciones y reservas", "Fogones ecológicos y estufas eficientes", "Viveros comunitarios", "Articulación institucional para educación ambiental", "Iniciativas ambientales independientes (turismo, educación ambiental y negocios verdes)", "Procesos productivos escolares"], "Emprendimiento": ["Entidades financieras en el territorio", "Presencia del SENA", "Iniciativas juveniles de emprendimiento", "Apoyo institucional", "Beneficios a población vulnerable"], "Enfoque de Género": ["Colectivo de mujeres", "Coordinación de juventud y género", "Rutas de atención a población vulnerable"], "Participación Política e Identidad": ["Consejo Municipal de Juventud (CMJ)", "Plataforma de juventud", "Coordinación de juventud", "Iniciativas juveniles organizadas", "Páramo del Sol como símbolo de identidad territorial", "Sentido comunitario arraigado al territorio"]}};
+const TEMAS  = [{"key": "Cultura", "icon": "🎭", "col": "#7C3AED"}, {"key": "Ambiente", "icon": "🌿", "col": "#059669"}, {"key": "Emprendimiento", "icon": "💼", "col": "#D97706"}, {"key": "Enfoque de Género", "icon": "🌈", "col": "#DB2777"}, {"key": "Participación Política e Identidad", "icon": "✊", "col": "#1D4ED8"}];
+const AI     = {"Arte y cultura": "🎨", "Medio ambiente y sostenibilidad": "🌿", "Emprendimiento y economía local": "💼", "Política y participación ciudadana": "✊", "Enfoque de género y diversidad": "🌈", "Deporte y recreación": "⚽", "Apropiación de territorio natural": "🏔️", "Saberes ancestrales": "🪶"};
+const AC     = {"Arte y cultura": "#7C3AED", "Medio ambiente y sostenibilidad": "#059669", "Emprendimiento y economía local": "#D97706", "Política y participación ciudadana": "#DC2626", "Enfoque de género y diversidad": "#DB2777", "Deporte y recreación": "#2563EB", "Apropiación de territorio natural": "#0891B2", "Saberes ancestrales": "#92400E"};
+
+const ZONA_COL = {Urbana:"#2563EB",Rural:"#059669",Mixta:"#D97706"};
+const LSHORT   = {"Ciudad Bolívar":"C.Bolívar","Santa Bárbara":"Sta.Bárbara","Angelópolis":"Angelóp.","Pueblorrico":"Pueblorr."};
+
+let fMun=null, fZona="Todos", fAreas=new Set(), query="", queryLQE="", cardOpen=null, pathAct=null, curIni=null;
+
+/* ── Mapa ── */
+const svgD3 = d3.select("#msvg");
+const tipEl = document.getElementById("tip");
+const mWrap = document.getElementById("mwrap");
+const W=340, H=440;
+svgD3.attr("viewBox",`0 0 ${W} ${H}`);
+const proj = d3.geoMercator().fitSize([W,H],GEO);
+const pFn  = d3.geoPath().projection(proj);
+
+const cMun = {};
+INIX.forEach(i => cMun[i.municipio]=(cMun[i.municipio]||0)+1);
+
+// Municipios con LQE
+const munConLQE = Object.keys(LQE);
+
+svgD3.selectAll("path.muni")
+  .data(GEO.features).enter().append("path")
+  .attr("class","muni")
+  .attr("d",pFn)
+  .attr("fill",d=>(PROV[d.properties.nombre]||{c:"#9ca3af"}).c)
+  .on("mousemove",function(ev,d){
+    const [mx,my]=d3.pointer(ev,mWrap);
+    const c=cMun[d.properties.nombre]||0;
+    tipEl.style.opacity="1";
+    tipEl.style.left=(mx+14)+"px"; tipEl.style.top=(my-12)+"px";
+    const tiene = munConLQE.includes(d.properties.nombre) ? " 📋" : "";
+    tipEl.textContent=d.properties.nombre+(c?" · "+c+" iniciativa"+(c!==1?"s":""):"")+tiene;
+  })
+  .on("mouseleave",()=>tipEl.style.opacity="0")
+  .on("click",function(ev,d){
+    tipEl.style.opacity="0";
+    const n=d.properties.nombre;
+    if(fMun===n){
+      fMun=null;
+      svgD3.selectAll("path.muni").classed("dim",false).classed("activo",false);
+      pathAct=null;
+    } else {
+      fMun=n;
+      if(pathAct) d3.select(pathAct).classed("activo",false);
+      d3.select(this).classed("activo",true); pathAct=this;
+      svgD3.selectAll("path.muni").classed("dim",dd=>dd.properties.nombre!==n);
+      d3.select(this).classed("dim",false);
+    }
+    updReset(); render();
+  });
+
+GEO.features.forEach(f=>{
+  const nm=f.properties.nombre, c=pFn.centroid(f), cnt=cMun[nm]||0;
+  if(!c||isNaN(c[0])) return;
+  svgD3.append("text").attr("class","lbl").attr("x",c[0]).attr("y",c[1]+(cnt?7:0)).text(LSHORT[nm]||nm);
+  if(cnt){
+    svgD3.append("circle").attr("class","cnt-bg").attr("cx",c[0]).attr("cy",c[1]-7).attr("r",9);
+    svgD3.append("text").attr("class","cnt-n").attr("cx",c[0]).attr("cy",c[1]-7).text(cnt);
+  }
+});
+
+/* ── Zona ── */
+document.querySelectorAll(".zb").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".zb").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); fZona=b.dataset.z; updReset(); render();
+}));
+
+/* ── Chips ── */
+const allAreas=[...new Set(INIX.flatMap(i=>i.areas))].sort();
+
+function setupChips(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  allAreas.forEach(a=>{
+    const b=document.createElement("button"); b.className="chip"; b.dataset.a=a;
+    b.textContent=(AI[a]||"•")+" "+a;
+    b.addEventListener("click",()=>{
+      if(fAreas.has(a)) fAreas.delete(a); else fAreas.add(a);
+      b.classList.toggle("on",fAreas.has(a)); updReset(); render();
+    });
+    container.appendChild(b);
+  });
+}
+setupChips("chips-perfil");
+
+/* ── Search ── */
+document.getElementById("srch-perfil").addEventListener("input",e=>{
+  query=e.target.value.toLowerCase(); updReset(); render();
+});
+document.getElementById("srch-lqe").addEventListener("input",e=>{
+  queryLQE=e.target.value.toLowerCase(); renderLQE();
+});
+
+/* ── Reset ── */
+function updReset(){
+  const d=fMun||fZona!=="Todos"||fAreas.size>0||query;
+  document.getElementById("btn-reset").classList.toggle("vis",!!d);
+}
+window.resetAll=function(){
+  fMun=null; fZona="Todos"; fAreas.clear(); query=""; queryLQE="";
+  document.getElementById("srch-perfil").value="";
+  document.getElementById("srch-lqe").value="";
+  document.querySelectorAll(".zb").forEach(b=>b.classList.toggle("on",b.dataset.z==="Todos"));
+  document.querySelectorAll(".chip").forEach(b=>b.classList.remove("on"));
+  svgD3.selectAll("path.muni").classed("dim",false).classed("activo",false);
+  pathAct=null; updReset(); render();
+};
+
+function getFilteredData() {
+  return INIX.filter(i=>{
+    if(fMun&&i.municipio!==fMun) return false;
+    if(fZona!=="Todos"&&i.zona!==fZona) return false;
+    if(fAreas.size>0&&!i.areas.some(a=>fAreas.has(a))) return false;
+    if(query){const h=(i.nombre+i.municipio+i.contacto+i.areas.join(" ")+i.lugar).toLowerCase(); if(!h.includes(query)) return false;}
+    return true;
+  });
+}
+
+/* ── Render ── */
+function render(){
+  const filt = getFilteredData();
+  const munis = new Set(filt.map(i=>i.municipio));
+  document.getElementById("sn").textContent=filt.length;
+  document.getElementById("sm").textContent=munis.size;
+  
+  renderPerfiles("lista-perfil", "ctxt-perfil", "badge-perfil", filt);
+  renderLQE();
+}
+
+/* ── Panel de Perfiles ── */
+function renderPerfiles(listaId, ctxtId, badgeId, data) {
+  const lista = document.getElementById(listaId);
+  const badge = document.getElementById(badgeId);
+  const ctxt = document.getElementById(ctxtId);
+  
+  badge.textContent = data.length;
+  ctxt.innerHTML = `<strong>${data.length}</strong> de ${INIX.length} iniciativas`;
+  
+  if(!data.length){
+    lista.innerHTML=`<div class="empty">Sin resultados.<br>Intenta otros filtros.</div>`;
+    return;
+  }
+  lista.innerHTML="";
+  data.forEach((ini,idx)=>{
+    const mc=AC[ini.areas[0]]||"#6b7280";
+    const div=document.createElement("div");
+    div.className="card"; div.style.animationDelay=(idx*18)+"ms";
+    const zc=ZONA_COL[ini.zona]||"#9ca3af";
+    const tl=ini.tipo==="Líder"
+      ?`<span style="color:#DB2777;font-size:9px;font-weight:600">👤</span>`
+      :`<span style="color:#2563EB;font-size:9px;font-weight:600">🤝</span>`;
+
+    div.innerHTML=`
+      <div class="ct">
+        <div class="cico" style="background:${mc}18">${AI[ini.areas[0]]||"●"}</div>
+        <div class="cbody">
+          <div class="cnom">${ini.nombre}</div>
+          <div class="cmeta">${tl}<span>📍 ${ini.municipio}</span><span style="color:${zc}">⬤ ${ini.zona}</span></div>
+          <div class="ctags">${ini.areas.slice(0,3).map(a=>`<span class="tag">${AI[a]||"•"} ${a}</span>`).join("")}${ini.areas.length>3?`<span class="tag">+${ini.areas.length-3}</span>`:""}</div>
+        </div>
+        <div class="carr">▾</div>
+      </div>
+      <div class="det">
+        <button class="btn-ver" onclick="abrirModal(${ini.id},'perfil')">👤 Ver perfil completo</button>
+      </div>`;
+
+    div.addEventListener("click",function(e){
+      if(e.target.tagName==="BUTTON"||e.target.tagName==="A"||e.target.closest("button,a")) return;
+      if(cardOpen&&cardOpen!==div) cardOpen.classList.remove("open");
+      div.classList.toggle("open");
+      cardOpen=div.classList.contains("open")?div:null;
+      if(div.classList.contains("open") && !fMun){
+        svgD3.selectAll("path.muni").classed("dim",d=>d.properties.nombre!==ini.municipio);
+        if(pathAct) d3.select(pathAct).classed("activo",false);
+        const p=svgD3.selectAll("path.muni").filter(d=>d.properties.nombre===ini.municipio).node();
+        if(p){d3.select(p).classed("activo",true);pathAct=p;}
+        setTimeout(()=>div.scrollIntoView({behavior:"smooth",block:"nearest"}),60);
+      } else if(!fMun){
+        svgD3.selectAll("path.muni").classed("dim",false);
+        if(pathAct){d3.select(pathAct).classed("activo",false);pathAct=null;}
+      }
+    });
+    lista.appendChild(div);
+  });
+}
+
+/* ── Panel de LQE - solo municipios ── */
+function renderLQE() {
+  const lista = document.getElementById("lista-lqe");
+  const badge = document.getElementById("badge-lqe");
+  const ctxt = document.getElementById("ctxt-lqe");
+  
+  // Obtener municipios únicos que tienen LQE
+  let municipios = Object.keys(LQE);
+  
+  // Filtrar por búsqueda
+  if(queryLQE){
+    municipios = municipios.filter(m => m.toLowerCase().includes(queryLQE));
+  }
+  
+  // Filtrar por zona si está seleccionada
+  if(fZona!=="Todos"){
+    municipios = municipios.filter(m => {
+      const iniciativas = INIX.filter(i => i.municipio === m);
+      return iniciativas.some(i => i.zona === fZona);
+    });
+  }
+  
+  // Filtrar por áreas si están seleccionadas
+  if(fAreas.size>0){
+    municipios = municipios.filter(m => {
+      const iniciativas = INIX.filter(i => i.municipio === m);
+      return iniciativas.some(i => i.areas.some(a => fAreas.has(a)));
+    });
+  }
+  
+  // Filtrar por municipio seleccionado en el mapa
+  if(fMun){
+    municipios = municipios.filter(m => m === fMun);
+  }
+  
+  badge.textContent = municipios.length;
+  ctxt.innerHTML = `<strong>${municipios.length}</strong> municipios con información`;
+  
+  if(!municipios.length){
+    lista.innerHTML=`<div class="empty">No hay municipios con esta información.<br>Intenta otros filtros.</div>`;
+    return;
+  }
+  
+  lista.innerHTML="";
+  municipios.forEach((mun, idx) => {
+    const div = document.createElement("div");
+    div.className = "card-muni";
+    div.style.animationDelay = (idx*18)+"ms";
+    const pInfo = PROV[mun] || {label: "Provincia", c: "#9ca3af"};
+    const count = INIX.filter(i => i.municipio === mun).length;
+    
+    div.innerHTML = `
+      <div>
+        <div class="muni-nom">${mun}</div>
+        <div class="muni-prov">${pInfo.label} · ${count} iniciativa${count!==1?"s":""}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="muni-badge">📋 Ver</span>
+        <span class="muni-arrow">→</span>
+      </div>
+    `;
+    
+    div.addEventListener("click", function() {
+      // Buscar una iniciativa de este municipio para abrir el modal con LQE
+      const ini = INIX.find(i => i.municipio === mun);
+      if(ini) abrirModal(ini.id, 'lqe');
+    });
+    
+    lista.appendChild(div);
+  });
+}
+
+/* ── Modal ── */
+window.abrirModal=function(id,modo){
+  const ini=INIX.find(i=>i.id===id); if(!ini) return;
+  curIni=ini;
+  
+  const mc=AC[ini.areas[0]]||"#6b7280";
+  const pInfo=PROV[ini.municipio]||{c:"#9ca3af",label:"—"};
+  const zc=ZONA_COL[ini.zona]||"#9ca3af";
+  document.getElementById("mico").style.cssText=`background:${mc}18;font-size:22px`;
+  document.getElementById("mico").textContent=AI[ini.areas[0]]||"●";
+  document.getElementById("mnom").textContent=modo==='lqe' ? `Lo que ya existe en ${ini.municipio}` : ini.nombre;
+
+  const bw=document.getElementById("mbgs"); bw.innerHTML="";
+  if(modo==='perfil'){
+    [
+      [ini.municipio,       "#EFF6FF", "#1D4ED8"],
+      ["⬤ "+ini.zona,       zc+"22",   zc       ],
+      [pInfo.label,         "#f0fdf4", "#065f46" ],
+    ].forEach(([t,bg,col])=>{
+      const s=document.createElement("span");
+      s.className="mbg"; s.textContent=t;
+      s.style.background=bg; s.style.color=col;
+      bw.appendChild(s);
+    });
+  } else {
+    [
+      [ini.municipio,       "#EFF6FF", "#1D4ED8"],
+      [pInfo.label,         "#f0fdf4", "#065f46" ],
+    ].forEach(([t,bg,col])=>{
+      const s=document.createElement("span");
+      s.className="mbg"; s.textContent=t;
+      s.style.background=bg; s.style.color=col;
+      bw.appendChild(s);
+    });
+  }
+
+  buildBody(ini, modo);
+  document.getElementById("modal").classList.add("on");
+  document.getElementById("mbody").scrollTop=0;
+};
+
+function buildMiniMap(mun){
+  const feat=GEO.features.find(f=>f.properties.nombre===mun);
+  const pc=(PROV[mun]||{c:"#9ca3af"}).c;
+  const box=document.getElementById("mmapabox"); if(!box) return;
+  box.innerHTML='<svg style="width:100%;height:100%"></svg>';
+  const ns=d3.select(box.querySelector("svg"));
+  if(!feat) return;
+  const mp=d3.geoMercator().fitSize([480,120],{type:"FeatureCollection",features:[feat]});
+  const mpFn=d3.geoPath().projection(mp);
+  ns.attr("viewBox","0 0 480 120");
+  const fi=ns.append("defs").append("filter").attr("id","shm").attr("x","-20%").attr("y","-20%").attr("width","140%").attr("height","140%");
+  fi.append("feDropShadow").attr("dx","0").attr("dy","2").attr("stdDeviation","5").attr("flood-opacity",".12");
+  ns.append("path").datum(feat).attr("d",mpFn).attr("fill",pc).attr("filter","url(#shm)").attr("stroke","#fff").attr("stroke-width","1.5").attr("stroke-linejoin","round");
+  const cen=mpFn.centroid(feat);
+  if(cen&&!isNaN(cen[0]))
+    ns.append("text").attr("x",cen[0]).attr("y",cen[1]).attr("text-anchor","middle").attr("dominant-baseline","middle").style("font-size","12px").style("fill","rgba(255,255,255,.9)").style("font-weight","800").text(mun);
+}
+
+function buildBody(ini, modo){
+  const body=document.getElementById("mbody");
+
+  if(modo==="perfil"){
+    const tel=ini.pub==="tel", pub=ini.pub!=="no";
+    let cbHtml="";
+    if(pub){
+      if(ini.email) cbHtml+=`<a class="mcb" href="mailto:${ini.email}">✉ ${ini.email}</a>`;
+      if(tel&&ini.celular&&ini.celular!=="N/A"&&ini.celular!==""){
+        const num=ini.celular.replace(/[^0-9]/g,"");
+        cbHtml+=`<a class="mcb wa" href="https://wa.me/57${num}" target="_blank">📱 WhatsApp ${ini.celular}</a>`;
+      }
+      if(ini.redes&&ini.redes!=="N/A"&&ini.redes!=="—"&&ini.redes!=="")
+        cbHtml+=`<span class="mcb">@ ${ini.redes}</span>`;
+    }
+    body.innerHTML=`
+      <div id="mmapabox"><svg style="width:100%;height:100%"></svg></div>
+      <div class="mg">
+        <div class="mc"><div class="mlbl">Tipo</div><div class="mval">${ini.tipo==="Líder"?"👤 Líder/a individual":"🤝 Colectivo"}</div></div>
+        <div class="mc"><div class="mlbl">Año de inicio</div><div class="mval">${ini.año||"—"}</div></div>
+        <div class="mc"><div class="mlbl">Integrantes</div><div class="mval">${ini.integrantes||"—"}</div></div>
+        <div class="mc"><div class="mlbl">Constitución</div><div class="mval">${ini.constituida||"—"}</div></div>
+        ${ini.lugar&&ini.lugar!=="—"?`<div class="mc" style="grid-column:1/-1"><div class="mlbl">Lugar de operación</div><div class="mval">${ini.lugar}</div></div>`:""}
+      </div>
+      <div class="mb"><div class="mlbl">Áreas temáticas</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${ini.areas.map(a=>`<span style="font-size:10px;padding:2px 8px;border-radius:16px;background:${AC[a]||"#9ca3af"}18;border:1px solid ${AC[a]||"#e5e7eb"}44;color:${AC[a]||"#6b7280"}">${AI[a]||"•"} ${a}</span>`).join("")}</div></div>
+      ${ini.desafio?`<div class="mb"><div class="mlbl">Principal desafío</div><div class="mq">${ini.desafio}</div></div>`:""}
+      ${ini.simbolo?`<div class="mb"><div class="mlbl">Símbolo del Suroeste</div><div class="mq">${ini.simbolo}</div></div>`:""}
+      <div class="mg">
+        <div class="mc"><div class="mlbl">Interés en Chiva</div><div class="mval">${ini.chiva}</div></div>
+        <div class="mc"><div class="mlbl">Acepta visita</div><div class="mval">${ini.visita}</div></div>
+      </div>
+      ${cbHtml?`<div class="mcont">${cbHtml}</div>`:""}`;
+    buildMiniMap(ini.municipio);
+
+  } else {
+    /* ── MODO LQE: Solo LO QUE YA EXISTE ── */
+    const mun = ini.municipio;
+    const lqe = LQE[mun];
+    let h = "";
+
+    h += `<p class="sec-hdr">🗂️ Lo que ya existe en ${mun}</p>`;
+    if(lqe){
+      h += `<div class="lqe-grid">`;
+      TEMAS.forEach(t=>{
+        const items = lqe[t.key] || [];
+        h += `<div class="lqe-card">
+          <div class="lqe-card-title"><span class="lqe-icon">${t.icon}</span> ${t.key}</div>
+          <div class="lqe-items">`;
+        if(items.length){
+          items.forEach(it => h += `<span class="lqe-item">${it}</span>`);
+        } else {
+          h += `<span class="lqe-empty">Sin información</span>`;
+        }
+        h += `</div></div>`;
+      });
+      h += `</div>`;
+    } else {
+      h += `<p class="no-lqe">La información de "Lo que ya existe" para <strong>${mun}</strong> será añadida próximamente.</p>`;
+    }
+
+    body.innerHTML = h;
+  }
+}
+
+window.cerrar=function(){document.getElementById("modal").classList.remove("on");curIni=null;};
+document.getElementById("modal").addEventListener("click",e=>{if(e.target.id==="modal")cerrar();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")cerrar();});
+
+render();
+</script>
+</body>
+</html>
